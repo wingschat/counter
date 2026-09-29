@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Count Things – Count objects in a photo online, free</title>
+<meta name="description" content="Upload a photo, show one example, and count every similar object instantly. Runs in your browser; your photos are never uploaded.">
+<meta name="theme-color" content="#4f46e5">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Count Things – Count objects in a photo">
+<meta property="og:description" content="Upload a photo, show one example, get the total. Private and free.">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%234f46e5'/%3E%3Ccircle cx='32' cy='36' r='11' fill='white'/%3E%3Ccircle cx='68' cy='36' r='11' fill='white'/%3E%3Ccircle cx='50' cy='68' r='11' fill='white'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#fafaf9;--card:#fff;--ink:#1c1917;--mute:#78716c;--line:#e7e5e4;--acc:#4f46e5;--accs:#eef2ff;--mark:#f43f5e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c0a09;--card:#1c1917;--ink:#fafaf9;--mute:#a8a29e;--line:#292524;--acc:#818cf8;--accs:#1e1b4b;--mark:#fb7185}}
+:root[data-theme="dark"]{--bg:#0c0a09;--card:#1c1917;--ink:#fafaf9;--mute:#a8a29e;--line:#292524;--acc:#818cf8;--accs:#1e1b4b;--mark:#fb7185}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:32px 20px 48px}
+h1{font-size:28px;margin:0;letter-spacing:-.02em}
+.sub{color:var(--mute);margin:4px 0 24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+#drop{border:2px dashed var(--line);border-radius:16px;padding:56px 20px;text-align:center;cursor:pointer;background:var(--card);transition:.15s}
+#drop.on,#drop:hover{border-color:var(--acc);background:var(--accs)}
+#drop b{display:block;font-size:18px;margin-bottom:4px}
+#drop span{color:var(--mute);font-size:14px}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:10px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+.link{background:none;border:none;color:var(--acc);padding:8px 0;margin-top:10px}
+#app{display:none}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.count{font-size:56px;font-weight:700;line-height:1;letter-spacing:-.03em}
+.count small{display:block;font-size:13px;font-weight:500;color:var(--mute);letter-spacing:0;margin-top:4px}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{border:none;background:none;padding:6px 12px}
+.seg button.a{background:var(--card);box-shadow:0 1px 2px #0002;color:var(--acc);font-weight:600}
+.stage{position:relative;border-radius:12px;overflow:hidden;background:var(--bg);line-height:0}
+canvas{width:100%;height:auto;touch-action:none;cursor:crosshair;display:block}
+#busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0006;color:#fff;font-size:15px;line-height:1}
+.ctl{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;align-items:end}
+.ctl label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute);flex:1;min-width:150px}
+input[type=range]{accent-color:var(--acc);width:100%}
+.hint{font-size:13px;color:var(--mute);margin:12px 0 0}
+.how{margin-top:48px}
+.how h2{font-size:18px;margin:0 0 12px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.steps div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:4px}
+.steps i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--accs);color:var(--acc);font-weight:700;font-size:13px;display:grid;place-items:center}
+.steps span{color:var(--mute);font-size:14px}
+footer{margin-top:40px;text-align:center;color:var(--mute);font-size:13px}
+@media (max-width:520px){main{padding:20px 14px 36px}.count{font-size:44px}}
+</style>
+</head>
+<body>
+<main>
+<h1>Count Things</h1>
+<p class="sub">Upload a photo. Show it one example. Get the total.</p>
+
+<div id="drop"><b>Drop a photo here or tap to upload</b><span>Nothing leaves your device</span>
+<input id="file" type="file" accept="image/*" hidden></div>
+<button class="link" id="sample">Or try a sample image</button>
+
+<div id="app" class="card">
+  <div class="top">
+    <div class="count"><span id="n">0</span><small id="lbl">objects</small></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div class="seg"><button id="mM" class="a">Match example</button><button id="mB">Auto blobs</button></div>
+      <button id="new">New photo</button>
+    </div>
+  </div>
+  <div class="stage"><canvas id="c"></canvas><div id="busy">Counting…</div></div>
+  <div class="ctl" id="cM"><label>Match strictness <input id="sT" type="range" min="40" max="95" value="70"></label></div>
+  <div class="ctl" id="cB" style="display:none">
+    <label>Threshold <input id="sB" type="range" min="-60" max="60" value="0"></label>
+    <label>Minimum size <input id="sS" type="range" min="2" max="400" value="20"></label>
+    <button id="inv">Objects: darker</button>
+  </div>
+  <p class="hint" id="hint">Drag a box around one object. Tap a mark to remove it, tap empty space to add one.</p>
+</div>
+
+<section class="how">
+  <h2>How it works</h2>
+  <div class="steps">
+    <div><i>1</i><b>Upload</b><span>Drop, paste (Ctrl/Cmd+V) or choose a photo.</span></div>
+    <div><i>2</i><b>Show one</b><span>Drag a box around a single example object.</span></div>
+    <div><i>3</i><b>Get the count</b><span>Fine-tune with the slider or tap to add and remove marks.</span></div>
+  </div>
+</section>
+<footer>Everything runs locally in your browser. Photos are never uploaded.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('c'),ctx=cv.getContext('2d');
+let img,W,H,gray,mode='M',tpl=null,ncc=null,dark=true,auto=[],added=[],excluded=[],drag=null;
+const MAX=420;
+
+function load(src){
+  const im=new Image();
+  im.onload=()=>{
+    const s=Math.min(1,1200/Math.max(im.width,im.height));
+    cv.width=Math.round(im.width*s);cv.height=Math.round(im.height*s);
+    img=document.createElement('canvas');img.width=cv.width;img.height=cv.height;
+    img.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+    const k=Math.min(1,MAX/Math.max(cv.width,cv.height));
+    W=Math.round(cv.width*k);H=Math.round(cv.height*k);
+    const t=document.createElement('canvas');t.width=W;t.height=H;
+    const tc=t.getContext('2d');tc.drawImage(img,0,0,W,H);
+    const d=tc.getImageData(0,0,W,H).data;gray=new Float32Array(W*H);
+    for(let i=0;i<W*H;i++)gray[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+    tpl=null;ncc=null;auto=[];added=[];excluded=[];
+    $('drop').style.display='none';$('sample').style.display='none';$('app').style.display='block';
+    setMode(mode);
+  };
+  im.src=src;
+}
+function sample(){
+  const c=document.createElement('canvas');c.width=700;c.height=480;const g=c.getContext('2d');
+  g.fillStyle='#f3efe6';g.fillRect(0,0,700,480);
+  let seed=7;const r=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const pts=[];
+  for(let i=0;i<400&&pts.length<34;i++){
+    const x=40+r()*620,y=40+r()*400;
+    if(pts.every(p=>Math.hypot(p[0]-x,p[1]-y)>62))pts.push([x,y]);
+  }
+  pts.forEach(([x,y])=>{
+    g.fillStyle='#b45309';g.beginPath();g.arc(x,y,26,0,7);g.fill();
+    g.fillStyle='#d97706';g.beginPath();g.arc(x-4,y-4,20,0,7);g.fill();
+    g.fillStyle='#fbbf24';g.beginPath();g.arc(x-8,y-9,7,0,7);g.fill();
+  });
+  load(c.toDataURL());
+}
+
+function setMode(m){
+  mode=m;
+  $('mM').classList.toggle('a',m==='M');$('mB').classList.toggle('a',m==='B');
+  $('cM').style.display=m==='M'?'flex':'none';$('cB').style.display=m==='B'?'flex':'none';
+  $('hint').textContent=m==='M'
+    ?'Drag a box around one object. Tap a mark to remove it, tap empty space to add one.'
+    :'Adjust the sliders until each object is marked once. Tap a mark to remove it, tap empty space to add one.';
+  added=[];excluded=[];
+  if(m==='B')blobs();else if(ncc)nms();
+  draw();
+}
+
+// Template matching (normalized cross-correlation)
+function match(){
+  const tw=tpl.w,th=tpl.h,st=Math.max(1,Math.ceil(Math.max(tw,th)/32));
+  const idx=[],tv=[];
+  for(let y=0;y<th;y+=st)for(let x=0;x<tw;x+=st){idx.push(y*W+x);tv.push(gray[(tpl.y+y)*W+tpl.x+x]);}
+  const n=tv.length,mean=tv.reduce((a,b)=>a+b,0)/n;
+  let tn=0;for(let i=0;i<n;i++){tv[i]-=mean;tn+=tv[i]*tv[i];}
+  tn=Math.sqrt(tn)||1;
+  const ow=W-tw+1,oh=H-th+1;ncc={w:ow,h:oh,d:new Float32Array(ow*oh)};
+  for(let y=0;y<oh;y++)for(let x=0;x<ow;x++){
+    const b=y*W+x;let num=0,s=0,s2=0;
+    for(let i=0;i<n;i++){const v=gray[b+idx[i]];num+=tv[i]*v;s+=v;s2+=v*v;}
+    const vr=s2-s*s/n;
+    ncc.d[y*ow+x]=vr>1e-3?num/(tn*Math.sqrt(vr)):0;
+  }
+  nms();
+}
+function nms(){
+  const t=$('sT').value/100,c=[];
+  for(let y=0;y<ncc.h;y++)for(let x=0;x<ncc.w;x++){const v=ncc.d[y*ncc.w+x];if(v>=t)c.push([v,x,y]);}
+  c.sort((a,b)=>b[0]-a[0]);
+  const rad=.6*Math.min(tpl.w,tpl.h),out=[];
+  for(const [,x,y] of c){
+    const cx=x+tpl.w/2,cy=y+tpl.h/2;
+    if(out.every(p=>Math.hypot(p[0]-cx,p[1]-cy)>rad))out.push([cx,cy]);
+  }
+  auto=out;
+}
+
+// Blob counting
+function blobs(){
+  let hist=new Array(256).fill(0);
+  for(let i=0;i<gray.length;i++)hist[gray[i]|0]++;
+  let tot=gray.length,sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];
+  let wb=0,sb=0,best=0,th=128;
+  for(let i=0;i<256;i++){wb+=hist[i];if(!wb)continue;const wf=tot-wb;if(!wf)break;sb+=i*hist[i];
+    const mb=sb/wb,mf=(sum-sb)/wf,v=wb*wf*(mb-mf)**2;if(v>best){best=v;th=i;}}
+  th+= +$('sB').value;
+  const minA=+$('sS').value,maxA=W*H*.2;
+  const bin=new Uint8Array(W*H);
+  for(let i=0;i<bin.length;i++)bin[i]=(dark?gray[i]<=th:gray[i]>th)?1:0;
+  const seen=new Uint8Array(W*H),out=[],stack=[];
+  for(let i=0;i<bin.length;i++){
+    if(!bin[i]||seen[i])continue;
+    let a=0,sx=0,sy=0;stack.push(i);seen[i]=1;
+    while(stack.length){
+      const p=stack.pop(),x=p%W,y=(p/W)|0;a++;sx+=x;sy+=y;
+      if(x>0&&bin[p-1]&&!seen[p-1]){seen[p-1]=1;stack.push(p-1);}
+      if(x<W-1&&bin[p+1]&&!seen[p+1]){seen[p+1]=1;stack.push(p+1);}
+      if(y>0&&bin[p-W]&&!seen[p-W]){seen[p-W]=1;stack.push(p-W);}
+      if(y<H-1&&bin[p+W]&&!seen[p+W]){seen[p+W]=1;stack.push(p+W);}
+    }
+    if(a>=minA&&a<=maxA)out.push([sx/a,sy/a]);
+  }
+  auto=out;
+}
+
+function final(){
+  const r=Math.max(4,.02*W);
+  return auto.filter(p=>!excluded.some(e=>Math.hypot(e[0]-p[0],e[1]-p[1])<r)).concat(added);
+}
+function draw(){
+  ctx.drawImage(img,0,0);
+  const k=cv.width/W,pts=final(),rr=Math.max(6,cv.width*.012);
+  ctx.lineWidth=Math.max(2,cv.width*.003);
+  pts.forEach(([x,y])=>{
+    ctx.beginPath();ctx.arc(x*k,y*k,rr,0,7);
+    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--mark');
+    ctx.globalAlpha=.9;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle='#fff';ctx.stroke();
+  });
+  const box=drag&&drag.moved?drag.box():(tpl&&mode==='M'?{x:tpl.x*k,y:tpl.y*k,w:tpl.w*k,h:tpl.h*k}:null);
+  if(box){ctx.setLineDash([8,5]);ctx.strokeStyle='#4f46e5';ctx.lineWidth=3;ctx.strokeRect(box.x,box.y,box.w,box.h);ctx.setLineDash([]);}
+  $('n').textContent=pts.length;
+  $('lbl').textContent=pts.length===1?'object':'objects';
+}
+
+// Pointer interaction
+function pos(e){const b=cv.getBoundingClientRect();return[(e.clientX-b.left)*cv.width/b.width,(e.clientY-b.top)*cv.height/b.height];}
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId);const p=pos(e);
+  drag={p,q:p,moved:false,box(){return{x:Math.min(this.p[0],this.q[0]),y:Math.min(this.p[1],this.q[1]),w:Math.abs(this.p[0]-this.q[0]),h:Math.abs(this.p[1]-this.q[1])};}};
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag)return;drag.q=pos(e);
+  if(mode==='M'&&Math.hypot(drag.q[0]-drag.p[0],drag.q[1]-drag.p[1])>10)drag.moved=true;
+  if(drag.moved)draw();
+});
+cv.addEventListener('pointerup',e=>{
+  if(!drag)return;const d=drag;drag=null;const k=cv.width/W;
+  if(d.moved){
+    const b=d.box(),x=Math.max(0,Math.round(b.x/k)),y=Math.max(0,Math.round(b.y/k));
+    const w=Math.min(W-x,Math.round(b.w/k)),h=Math.min(H-y,Math.round(b.h/k));
+    if(w<6||h<6){draw();return;}
+    tpl={x,y,w,h};added=[];excluded=[];
+    $('busy').style.display='flex';
+    setTimeout(()=>{match();$('busy').style.display='none';draw();},30);
+    return;
+  }
+  const px=d.p[0]/k,py=d.p[1]/k,r=Math.max(8,.025*W),f=final();
+  const hit=f.find(p=>Math.hypot(p[0]-px,p[1]-py)<r);
+  if(hit){
+    const ai=added.indexOf(hit);
+    if(ai>=0)added.splice(ai,1);else excluded.push(hit);
+  }else added.push([px,py]);
+  draw();
+});
+
+// Controls
+$('sT').oninput=()=>{if(ncc){nms();draw();}};
+$('sB').oninput=$('sS').oninput=()=>{blobs();draw();};
+$('inv').onclick=()=>{dark=!dark;$('inv').textContent='Objects: '+(dark?'darker':'lighter');blobs();draw();};
+$('mM').onclick=()=>setMode('M');$('mB').onclick=()=>setMode('B');
+$('new').onclick=()=>{$('app').style.display='none';$('drop').style.display='block';$('sample').style.display='block';};
+$('sample').onclick=sample;
+document.addEventListener('paste',e=>{
+  const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
+  if(it)load(URL.createObjectURL(it.getAsFile()));
+});
+$('drop').onclick=()=>$('file').click();
+$('file').onchange=e=>{const f=e.target.files[0];if(f)load(URL.createObjectURL(f));};
+['dragover','dragenter'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.add('on');}));
+['dragleave','drop'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.remove('on');}));
+$('drop').addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)load(URL.createObjectURL(f));});
+</script>
+</body>
+</html>
