@@ -49,7 +49,14 @@ input[type=range]{accent-color:var(--acc);width:100%}
 .row .link{margin:0}
 #camView{display:none;position:fixed;inset:0;z-index:50;background:#000;flex-direction:column}
 #camView.on{display:flex}
-#vid{flex:1;min-height:0;width:100%;object-fit:cover}
+.vwrap{position:relative;flex:1;min-height:0}
+#vid,#ov{position:absolute;inset:0;width:100%;height:100%}
+#vid{object-fit:contain}
+#ov{pointer-events:none}
+#liveN{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:#000a;color:#fff;font-size:34px;font-weight:700;padding:4px 20px;border-radius:999px;line-height:1.3}
+.live{display:flex;gap:14px;align-items:center;padding:12px 20px 0;color:#fff;font-size:12px;flex-wrap:wrap}
+.live label{display:flex;flex-direction:column;gap:2px;flex:1;min-width:110px}
+.live button{background:#ffffff22;border-color:transparent;color:#fff}
 .camBar{display:flex;align-items:center;justify-content:space-between;padding:20px 24px calc(20px + env(safe-area-inset-bottom,0px))}
 .camBar button{background:#ffffff22;border-color:transparent;color:#fff;min-width:80px}
 #shot{width:68px;height:68px;min-width:0;border-radius:50%;background:#fff;border:5px solid #ffffff88;padding:0}
@@ -76,7 +83,16 @@ footer{margin-top:40px;text-align:center;color:var(--mute);font-size:13px}
 </div>
 <input id="capFile" type="file" accept="image/*" capture="environment" hidden>
 <div id="camView">
-  <video id="vid" autoplay playsinline muted></video>
+  <div class="vwrap">
+    <video id="vid" autoplay playsinline muted></video>
+    <canvas id="ov"></canvas>
+    <div id="liveN">0</div>
+  </div>
+  <div class="live">
+    <button id="lD">Objects: darker</button>
+    <label>Threshold <input id="lT" type="range" min="-60" max="60" value="0"></label>
+    <label>Min size <input id="lS" type="range" min="1" max="200" value="20"></label>
+  </div>
   <div class="camBar">
     <button id="camX">Cancel</button>
     <button id="shot" aria-label="Take photo"></button>
@@ -196,15 +212,16 @@ function nms(){
 }
 
 // Blob counting
-function blobs(){
+function blobs(){auto=findBlobs(gray,W,H,dark,+$('sB').value,+$('sS').value);}
+function findBlobs(gray,W,H,dark,off,minA){
   let hist=new Array(256).fill(0);
   for(let i=0;i<gray.length;i++)hist[gray[i]|0]++;
   let tot=gray.length,sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];
   let wb=0,sb=0,best=0,th=128;
   for(let i=0;i<256;i++){wb+=hist[i];if(!wb)continue;const wf=tot-wb;if(!wf)break;sb+=i*hist[i];
     const mb=sb/wb,mf=(sum-sb)/wf,v=wb*wf*(mb-mf)**2;if(v>best){best=v;th=i;}}
-  th+= +$('sB').value;
-  const minA=+$('sS').value,maxA=W*H*.2;
+  th+=off;
+  const maxA=W*H*.2;
   const bin=new Uint8Array(W*H);
   for(let i=0;i<bin.length;i++)bin[i]=(dark?gray[i]<=th:gray[i]>th)?1:0;
   const seen=new Uint8Array(W*H),out=[],stack=[];
@@ -220,7 +237,7 @@ function blobs(){
     }
     if(a>=minA&&a<=maxA)out.push([sx/a,sy/a]);
   }
-  auto=out;
+  return out;
 }
 
 function final(){
@@ -288,12 +305,38 @@ async function startCam(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false});
     $('vid').srcObject=stream;$('camView').classList.add('on');
+    clearTimeout(liveTimer);liveTick();
   }catch(err){
     // Permission denied or no camera: fall back to the device's native camera/file picker
     $('capFile').click();
   }
 }
+let liveTimer=null,ldark=true;
+const lc=document.createElement('canvas'),lx=lc.getContext('2d',{willReadFrequently:true});
+function liveTick(){
+  if(!stream)return;
+  const v=$('vid');
+  if(v.videoWidth){
+    const k=Math.min(1,220/Math.max(v.videoWidth,v.videoHeight));
+    const w=Math.round(v.videoWidth*k),h=Math.round(v.videoHeight*k);
+    lc.width=w;lc.height=h;lx.drawImage(v,0,0,w,h);
+    const d=lx.getImageData(0,0,w,h).data,g=new Float32Array(w*h);
+    for(let i=0;i<w*h;i++)g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+    const pts=findBlobs(g,w,h,ldark,+$('lT').value,Math.max(1,Math.round(w*h*$('lS').value/100000)));
+    const o=$('ov'),r=o.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+    o.width=r.width*dpr;o.height=r.height*dpr;
+    const c=o.getContext('2d');c.scale(dpr,dpr);
+    const s=Math.min(r.width/v.videoWidth,r.height/v.videoHeight);
+    const ox=(r.width-v.videoWidth*s)/2,oy=(r.height-v.videoHeight*s)/2;
+    c.fillStyle='#f43f5e';c.strokeStyle='#fff';c.lineWidth=2;
+    pts.forEach(([x,y])=>{c.beginPath();c.arc(ox+x/k*s,oy+y/k*s,8,0,7);c.fill();c.stroke();});
+    $('liveN').textContent=pts.length;
+  }
+  liveTimer=setTimeout(liveTick,150);
+}
+$('lD').onclick=()=>{ldark=!ldark;$('lD').textContent='Objects: '+(ldark?'darker':'lighter');};
 function stopCam(){
+  clearTimeout(liveTimer);
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
   $('vid').srcObject=null;$('camView').classList.remove('on');
 }
@@ -304,6 +347,11 @@ $('shot').onclick=()=>{
   const v=$('vid');if(!v.videoWidth)return;
   const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;
   c.getContext('2d').drawImage(v,0,0);
+  const k2=Math.min(1,MAX/Math.max(c.width,c.height));
+  mode='B';dark=ldark;
+  $('inv').textContent='Objects: '+(dark?'darker':'lighter');
+  $('sB').value=$('lT').value;
+  $('sS').value=Math.min(400,Math.max(2,Math.round(c.width*k2*c.height*k2*$('lS').value/100000)));
   stopCam();load(c.toDataURL('image/jpeg',.92));
 };
 $('capFile').onchange=e=>{const f=e.target.files[0];if(f)load(URL.createObjectURL(f));};
