@@ -45,6 +45,14 @@ canvas{width:100%;height:auto;touch-action:none;cursor:crosshair;display:block}
 .ctl label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute);flex:1;min-width:150px}
 input[type=range]{accent-color:var(--acc);width:100%}
 .hint{font-size:13px;color:var(--mute);margin:12px 0 0}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.row .link{margin:0}
+#camView{display:none;position:fixed;inset:0;z-index:50;background:#000;flex-direction:column}
+#camView.on{display:flex}
+#vid{flex:1;min-height:0;width:100%;object-fit:cover}
+.camBar{display:flex;align-items:center;justify-content:space-between;padding:20px 24px calc(20px + env(safe-area-inset-bottom,0px))}
+.camBar button{background:#ffffff22;border-color:transparent;color:#fff;min-width:80px}
+#shot{width:68px;height:68px;min-width:0;border-radius:50%;background:#fff;border:5px solid #ffffff88;padding:0}
 .how{margin-top:48px}
 .how h2{font-size:18px;margin:0 0 12px}
 .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
@@ -62,14 +70,26 @@ footer{margin-top:40px;text-align:center;color:var(--mute);font-size:13px}
 
 <div id="drop"><b>Drop a photo here or tap to upload</b><span>Nothing leaves your device</span>
 <input id="file" type="file" accept="image/*" hidden></div>
-<button class="link" id="sample">Or try a sample image</button>
+<div class="row" id="rowStart">
+  <button class="p" id="cam">📷 Use camera</button>
+  <button class="link" id="sample">Or try a sample image</button>
+</div>
+<input id="capFile" type="file" accept="image/*" capture="environment" hidden>
+<div id="camView">
+  <video id="vid" autoplay playsinline muted></video>
+  <div class="camBar">
+    <button id="camX">Cancel</button>
+    <button id="shot" aria-label="Take photo"></button>
+    <button id="flip">Flip</button>
+  </div>
+</div>
 
 <div id="app" class="card">
   <div class="top">
     <div class="count"><span id="n">0</span><small id="lbl">objects</small></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <div class="seg"><button id="mM" class="a">Match example</button><button id="mB">Auto blobs</button></div>
-      <button id="new">New photo</button>
+      <button id="camB">📷 Camera</button><button id="new">New photo</button>
     </div>
   </div>
   <div class="stage"><canvas id="c"></canvas><div id="busy">Counting…</div></div>
@@ -112,7 +132,7 @@ function load(src){
     const d=tc.getImageData(0,0,W,H).data;gray=new Float32Array(W*H);
     for(let i=0;i<W*H;i++)gray[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
     tpl=null;ncc=null;auto=[];added=[];excluded=[];
-    $('drop').style.display='none';$('sample').style.display='none';$('app').style.display='block';
+    $('drop').style.display='none';$('rowStart').style.display='none';$('app').style.display='block';
     setMode(mode);
   };
   im.src=src;
@@ -258,7 +278,36 @@ $('sT').oninput=()=>{if(ncc){nms();draw();}};
 $('sB').oninput=$('sS').oninput=()=>{blobs();draw();};
 $('inv').onclick=()=>{dark=!dark;$('inv').textContent='Objects: '+(dark?'darker':'lighter');blobs();draw();};
 $('mM').onclick=()=>setMode('M');$('mB').onclick=()=>setMode('B');
-$('new').onclick=()=>{$('app').style.display='none';$('drop').style.display='block';$('sample').style.display='block';};
+$('new').onclick=()=>{$('app').style.display='none';$('drop').style.display='block';$('rowStart').style.display='flex';};
+
+// Camera
+let stream=null,facing='environment';
+async function startCam(){
+  stopCam();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('capFile').click();return;}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false});
+    $('vid').srcObject=stream;$('camView').classList.add('on');
+  }catch(err){
+    // Permission denied or no camera: fall back to the device's native camera/file picker
+    $('capFile').click();
+  }
+}
+function stopCam(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  $('vid').srcObject=null;$('camView').classList.remove('on');
+}
+$('cam').onclick=$('camB').onclick=startCam;
+$('camX').onclick=stopCam;
+$('flip').onclick=()=>{facing=facing==='environment'?'user':'environment';startCam();};
+$('shot').onclick=()=>{
+  const v=$('vid');if(!v.videoWidth)return;
+  const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  stopCam();load(c.toDataURL('image/jpeg',.92));
+};
+$('capFile').onchange=e=>{const f=e.target.files[0];if(f)load(URL.createObjectURL(f));};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')stopCam();});
 $('sample').onclick=sample;
 document.addEventListener('paste',e=>{
   const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
